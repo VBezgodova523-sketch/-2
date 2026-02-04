@@ -2,196 +2,147 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GitHub Music Widget Builder</title>
     <style>
-        :root { --primary: #00d2ff; --bg: rgba(15, 15, 25, 0.95); }
-        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        body { margin: 0; padding: 10px; font-family: 'Segoe UI', sans-serif; background: transparent; overflow: hidden; color: white; }
         
-        /* Стили редактора */
-        .editor-panel { background: #2a2a2a; padding: 20px; border-radius: 15px; margin-bottom: 30px; width: 100%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; font-size: 12px; color: #aaa; margin-bottom: 5px; }
-        input { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
-        .row { display: flex; gap: 10px; }
-        button { background: var(--primary); border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { opacity: 0.8; }
-        textarea { width: 100%; height: 80px; background: #111; color: #0f0; border: 1px solid #444; margin-top: 10px; font-family: monospace; font-size: 11px; padding: 10px; box-sizing: border-box; }
+        /* Контейнер плеера в стиле референса */
+        .player-card {
+            background: linear-gradient(145deg, rgba(20,20,30,0.9), rgba(10,10,15,0.95));
+            border-radius: 40px;
+            padding: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
 
-        /* Стили плеера (как на референсе) */
-        .player-preview { position: relative; width: 480px; height: 220px; background: var(--bg); border-radius: 40px; border: 4px solid #333; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .glass-shine { position: absolute; top: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent); pointer-events: none; }
+        .repo-label { font-size: 9px; letter-spacing: 2px; color: #00d2ff; margin-bottom: 10px; opacity: 0.7; }
+        .track-name { font-weight: 600; font-size: 1.1em; margin-bottom: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+
+        /* Визуализатор */
+        .visualizer { display: flex; align-items: flex-end; gap: 3px; height: 30px; margin-bottom: 20px; }
+        .bar { width: 4px; background: #00d2ff; border-radius: 2px; height: 4px; transition: 0.2s; }
+
+        /* Управление */
+        .controls { display: flex; align-items: center; gap: 25px; }
+        .btn { background: none; border: none; color: white; cursor: pointer; font-size: 20px; opacity: 0.8; transition: 0.2s; }
+        .btn:hover { opacity: 1; transform: scale(1.1); }
+        .play-btn { width: 55px; height: 55px; border-radius: 50%; background: #00d2ff; color: #000; font-size: 24px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 15px rgba(0,210,255,0.4); }
+
+        /* Прогресс */
+        .progress-area { width: 90%; margin-top: 20px; }
+        #progress { width: 100%; cursor: pointer; accent-color: #00d2ff; height: 4px; }
         
-        .track-info { z-index: 2; text-align: center; margin-bottom: 15px; }
-        #track-name { font-size: 18px; font-weight: bold; margin: 0; }
-        #repo-tag { font-size: 10px; color: var(--primary); letter-spacing: 2px; }
-
-        .viz-container { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin-bottom: 15px; }
-        .bar { width: 4px; background: var(--primary); border-radius: 2px; transition: height 0.2s; }
-
-        .controls { display: flex; align-items: center; gap: 20px; z-index: 2; }
-        .play-btn { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; font-size: 24px; background: rgba(0,0,0,0.3); color: white; cursor: pointer; }
-        .side-btn { font-size: 20px; cursor: pointer; background: none; border: none; color: white; opacity: 0.7; }
-        
-        #progress-container { width: 80%; height: 4px; background: #444; border-radius: 2px; margin-top: 15px; position: relative; cursor: pointer; }
-        #progress-bar { height: 100%; background: var(--primary); width: 0%; border-radius: 2px; }
+        /* Плейлист (по клику) */
+        #playlist-btn { position: absolute; top: 20px; right: 25px; font-size: 14px; opacity: 0.5; }
+        #list-container { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(10,10,15,0.98); border-radius: 40px; 
+            display: none; flex-direction: column; padding: 20px; box-sizing: border-box; overflow-y: auto;
+        }
     </style>
 </head>
 <body>
 
-    <div class="editor-panel">
-        <h3>Настройка плеера</h3>
-        <div class="input-group">
-            <label>Ссылка на папку GitHub (user/repo/path)</label>
-            <input type="text" id="gh-path" placeholder="VBezgodova523-sketch/-1" value="VBezgodova523-sketch/-1">
-        </div>
-        <div class="row">
-            <div class="input-group">
-                <label>Основной цвет</label>
-                <input type="color" id="color-picker" value="#00d2ff" oninput="updateStyle()">
-            </div>
-            <div class="input-group">
-                <label>Прозрачность фона</label>
-                <input type="range" id="opacity-picker" min="0" max="100" value="95" oninput="updateStyle()">
-            </div>
-        </div>
-        <button onclick="loadPlaylist()">Обновить плейлист</button>
-        <textarea id="output-code" readonly onclick="this.select()"></textarea>
+<div class="player-card">
+    <div id="playlist-btn" onclick="toggleList()">☰</div>
+    <div class="repo-label">VBEZGODOVA523-SKETCH / -1</div>
+    <div class="track-name" id="title">Загрузка...</div>
+
+    <div class="visualizer" id="viz"></div>
+
+    <div class="controls">
+        <button class="btn" onclick="prev()">⏮</button>
+        <button class="btn play-btn" onclick="togglePlay()" id="playIcon">▶</button>
+        <button class="btn" onclick="next()">⏭</button>
     </div>
 
-    <div class="player-preview" id="player">
-        <div class="glass-shine"></div>
-        <div id="repo-tag">REPOSITORY NAME</div>
-        <div class="track-info">
-            <p id="track-name">Нажмите Play</p>
-        </div>
-
-        <div class="viz-container" id="visualizer">
-            </div>
-
-        <div class="controls">
-            <button class="side-btn" onclick="prev()">⏮</button>
-            <button class="play-btn" id="master-play" onclick="togglePlay()">▶</button>
-            <button class="side-btn" onclick="next()">⏭</button>
-        </div>
-
-        <div id="progress-container" onclick="seek(event)">
-            <div id="progress-bar"></div>
-        </div>
+    <div class="progress-area">
+        <input type="range" id="progress" value="0" step="0.1">
     </div>
 
-    <audio id="audio-player"></audio>
+    <div id="list-container">
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+            <b>Плейлист</b>
+            <span onclick="toggleList()" style="cursor:pointer">✕</span>
+        </div>
+        <div id="list-items"></div>
+    </div>
+</div>
+
+<audio id="main-audio"></audio>
 
 <script>
+    const user = "VBezgodova523";
+    const repo = "VBezgodova523-sketch";
+    const path = "-1"; // Твоя папка
+
+    const audio = document.getElementById('main-audio');
     let playlist = [];
-    let currentIndex = 0;
-    const audio = document.getElementById('audio-player');
-    
-    // Инициализация визуализатора
-    const viz = document.getElementById('visualizer');
-    for(let i=0; i<30; i++) {
-        let bar = document.createElement('div');
-        bar.className = 'bar';
-        bar.style.height = '5px';
-        viz.appendChild(bar);
+    let cur = 0;
+
+    // Создаем полоски визуализатора
+    const viz = document.getElementById('viz');
+    for(let i=0; i<25; i++) {
+        let b = document.createElement('div');
+        b.className = 'bar';
+        viz.appendChild(b);
     }
 
-    function updateStyle() {
-        const color = document.getElementById('color-picker').value;
-        const opacity = document.getElementById('opacity-picker').value / 100;
-        document.documentElement.style.setProperty('--primary', color);
-        document.documentElement.style.setProperty('--bg', `rgba(15, 15, 25, ${opacity})`);
-        generateCode();
+    async function getMusic() {
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${path}`);
+        const files = await res.json();
+        playlist = files.filter(f => f.name.endsWith('.mp3'));
+        renderList();
+        if(playlist.length > 0) loadTrack(0);
     }
 
-    async function loadPlaylist() {
-        const path = document.getElementById('gh-path').value.split('/');
-        const user = path[0];
-        const repo = path[1];
-        const folder = path.slice(2).join('/');
-        
-        document.getElementById('repo-tag').innerText = repo.toUpperCase();
-
-        try {
-            const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${folder}`);
-            const data = await res.json();
-            playlist = data.filter(file => file.name.endsWith('.mp3'));
-            
-            if(playlist.length > 0) {
-                currentIndex = 0;
-                loadTrack(currentIndex);
-            } else {
-                alert("MP3 файлы не найдены в этой папке!");
-            }
-        } catch (e) {
-            alert("Ошибка загрузки. Проверьте путь или лимиты GitHub API.");
-        }
-    }
-
-    function loadTrack(index) {
-        audio.src = playlist[index].download_url;
-        document.getElementById('track-name').innerText = playlist[index].name.replace('.mp3', '');
-        generateCode();
+    function loadTrack(idx) {
+        cur = idx;
+        audio.src = playlist[idx].download_url;
+        document.getElementById('title').innerText = playlist[idx].name.replace('.mp3', '');
     }
 
     function togglePlay() {
-        if(playlist.length === 0) return;
         if(audio.paused) {
             audio.play();
-            document.getElementById('master-play').innerText = '⏸';
-            animateViz();
+            document.getElementById('playIcon').innerText = '⏸';
+            animate();
         } else {
             audio.pause();
-            document.getElementById('master-play').innerText = '▶';
+            document.getElementById('playIcon').innerText = '▶';
         }
     }
 
-    function next() {
-        currentIndex = (currentIndex + 1) % playlist.length;
-        loadTrack(currentIndex);
-        audio.play();
+    function next() { cur = (cur+1)%playlist.length; loadTrack(cur); audio.play(); }
+    function prev() { cur = (cur-1+playlist.length)%playlist.length; loadTrack(cur); audio.play(); }
+
+    function animate() {
+        if(audio.paused) return;
+        document.querySelectorAll('.bar').forEach(b => {
+            b.style.height = (Math.random() * 25 + 5) + 'px';
+        });
+        setTimeout(animate, 100);
     }
 
-    function prev() {
-        currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
-        loadTrack(currentIndex);
-        audio.play();
-    }
-
-    // Обновление прогресс-бара
     audio.ontimeupdate = () => {
-        const pct = (audio.currentTime / audio.duration) * 100;
-        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress').value = (audio.currentTime / audio.duration) * 100;
     };
 
-    function seek(e) {
-        const rect = document.getElementById('progress-container').getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        audio.currentTime = pos * audio.duration;
+    document.getElementById('progress').oninput = (e) => {
+        audio.currentTime = (e.target.value / 100) * audio.duration;
+    };
+
+    function toggleList() {
+        const l = document.getElementById('list-container');
+        l.style.display = l.style.display === 'flex' ? 'none' : 'flex';
     }
 
-    function animateViz() {
-        if(audio.paused) return;
-        const bars = document.querySelectorAll('.bar');
-        bars.forEach(bar => {
-            const h = Math.random() * 35 + 5;
-            bar.style.height = h + 'px';
-        });
-        setTimeout(animateViz, 150);
-    }
-
-    function generateCode() {
-        const color = document.getElementById('color-picker').value;
-        const gh = document.getElementById('gh-path').value;
-        const htmlCode = `<iframe src="https://vbezgodova523-sketch.github.io/-1/" 
-style="width:500px; height:250px; border:none; background:transparent;" 
-allow="autoplay"></iframe>`;
-        // В реальном Genially тебе нужно будет захостить этот HTML на GitHub Pages 
-        // и вставить ссылку на него.
-        document.getElementById('output-code').value = htmlCode;
-    }
-
-    updateStyle();
-</script>
-</body>
-</html>
+    function renderList() {
+        const container = document.getElementById('list-items');
+        playlist.forEach((t, i) => {
+            let item = document.createElement('div');
+            item.style.padding = "8px 0";
+            item.
