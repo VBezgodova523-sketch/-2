@@ -2,29 +2,196 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Genially Audio Widget Builder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Music Widget Builder</title>
     <style>
-        :root { --accent: #00d2ff; --bg: #0f1015; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { display: grid; grid-template-columns: 350px 450px; gap: 20px; background: #1a1b20; padding: 30px; border-radius: 20px; border: 1px solid #333; }
-        .config-box input, .config-box select { width: 100%; padding: 10px; margin: 10px 0 20px; border-radius: 8px; border: 1px solid #444; background: #000; color: #fff; }
-        .preview-box { display: flex; flex-direction: column; align-items: center; justify-content: center; background: url('https://www.transparenttextures.com/patterns/carbon-fibre.png'); border-radius: 15px; }
-        .code-area { grid-column: span 2; margin-top: 20px; }
-        textarea { width: 100%; height: 120px; background: #000; color: #0f0; border: 1px solid #333; padding: 10px; font-family: monospace; font-size: 11px; border-radius: 10px; }
-        button { width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-        button:hover { opacity: 0.8; transform: translateY(-2px); }
-        .badge { background: #333; padding: 5px 10px; border-radius: 5px; font-size: 12px; margin-bottom: 10px; display: inline-block; }
+        :root { --primary: #00d2ff; --bg: rgba(15, 15, 25, 0.95); }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        
+        /* Стили редактора */
+        .editor-panel { background: #2a2a2a; padding: 20px; border-radius: 15px; margin-bottom: 30px; width: 100%; max-width: 600px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .input-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; color: #aaa; margin-bottom: 5px; }
+        input { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: white; border-radius: 5px; box-sizing: border-box; }
+        .row { display: flex; gap: 10px; }
+        button { background: var(--primary); border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
+        textarea { width: 100%; height: 80px; background: #111; color: #0f0; border: 1px solid #444; margin-top: 10px; font-family: monospace; font-size: 11px; padding: 10px; box-sizing: border-box; }
+
+        /* Стили плеера (как на референсе) */
+        .player-preview { position: relative; width: 480px; height: 220px; background: var(--bg); border-radius: 40px; border: 4px solid #333; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .glass-shine { position: absolute; top: 0; left: 0; width: 100%; height: 50%; background: linear-gradient(to bottom, rgba(255,255,255,0.1), transparent); pointer-events: none; }
+        
+        .track-info { z-index: 2; text-align: center; margin-bottom: 15px; }
+        #track-name { font-size: 18px; font-weight: bold; margin: 0; }
+        #repo-tag { font-size: 10px; color: var(--primary); letter-spacing: 2px; }
+
+        .viz-container { display: flex; align-items: flex-end; gap: 2px; height: 40px; margin-bottom: 15px; }
+        .bar { width: 4px; background: var(--primary); border-radius: 2px; transition: height 0.2s; }
+
+        .controls { display: flex; align-items: center; gap: 20px; z-index: 2; }
+        .play-btn { width: 60px; height: 60px; border-radius: 50%; border: 2px solid var(--primary); display: flex; align-items: center; justify-content: center; font-size: 24px; background: rgba(0,0,0,0.3); color: white; cursor: pointer; }
+        .side-btn { font-size: 20px; cursor: pointer; background: none; border: none; color: white; opacity: 0.7; }
+        
+        #progress-container { width: 80%; height: 4px; background: #444; border-radius: 2px; margin-top: 15px; position: relative; cursor: pointer; }
+        #progress-bar { height: 100%; background: var(--primary); width: 0%; border-radius: 2px; }
     </style>
 </head>
 <body>
 
-    <h2 style="color:var(--accent)">🎵 Genially Music Widget Maker</h2>
-    <p>Настройте плеер и вставьте код в Genially (Insert -> Others)</p>
+    <div class="editor-panel">
+        <h3>Настройка плеера</h3>
+        <div class="input-group">
+            <label>Ссылка на папку GitHub (user/repo/path)</label>
+            <input type="text" id="gh-path" placeholder="VBezgodova523-sketch/-1" value="VBezgodova523-sketch/-1">
+        </div>
+        <div class="row">
+            <div class="input-group">
+                <label>Основной цвет</label>
+                <input type="color" id="color-picker" value="#00d2ff" oninput="updateStyle()">
+            </div>
+            <div class="input-group">
+                <label>Прозрачность фона</label>
+                <input type="range" id="opacity-picker" min="0" max="100" value="95" oninput="updateStyle()">
+            </div>
+        </div>
+        <button onclick="loadPlaylist()">Обновить плейлист</button>
+        <textarea id="output-code" readonly onclick="this.select()"></textarea>
+    </div>
 
-    <div class="container">
-        <div class="config-box">
-            <span class="badge">1. Настройки GitHub</span>
-            <label>User/Repository</label>
-            <input type="text" id="repoPath" value="VBezgodova523/sketch" placeholder="User/Repo" oninput="updateAll()">
+    <div class="player-preview" id="player">
+        <div class="glass-shine"></div>
+        <div id="repo-tag">REPOSITORY NAME</div>
+        <div class="track-info">
+            <p id="track-name">Нажмите Play</p>
+        </div>
+
+        <div class="viz-container" id="visualizer">
+            </div>
+
+        <div class="controls">
+            <button class="side-btn" onclick="prev()">⏮</button>
+            <button class="play-btn" id="master-play" onclick="togglePlay()">▶</button>
+            <button class="side-btn" onclick="next()">⏭</button>
+        </div>
+
+        <div id="progress-container" onclick="seek(event)">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+
+    <audio id="audio-player"></audio>
+
+<script>
+    let playlist = [];
+    let currentIndex = 0;
+    const audio = document.getElementById('audio-player');
+    
+    // Инициализация визуализатора
+    const viz = document.getElementById('visualizer');
+    for(let i=0; i<30; i++) {
+        let bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = '5px';
+        viz.appendChild(bar);
+    }
+
+    function updateStyle() {
+        const color = document.getElementById('color-picker').value;
+        const opacity = document.getElementById('opacity-picker').value / 100;
+        document.documentElement.style.setProperty('--primary', color);
+        document.documentElement.style.setProperty('--bg', `rgba(15, 15, 25, ${opacity})`);
+        generateCode();
+    }
+
+    async function loadPlaylist() {
+        const path = document.getElementById('gh-path').value.split('/');
+        const user = path[0];
+        const repo = path[1];
+        const folder = path.slice(2).join('/');
+        
+        document.getElementById('repo-tag').innerText = repo.toUpperCase();
+
+        try {
+            const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/${folder}`);
+            const data = await res.json();
+            playlist = data.filter(file => file.name.endsWith('.mp3'));
             
-            <span class="badge">2. Внешний вид</span>
+            if(playlist.length > 0) {
+                currentIndex = 0;
+                loadTrack(currentIndex);
+            } else {
+                alert("MP3 файлы не найдены в этой папке!");
+            }
+        } catch (e) {
+            alert("Ошибка загрузки. Проверьте путь или лимиты GitHub API.");
+        }
+    }
+
+    function loadTrack(index) {
+        audio.src = playlist[index].download_url;
+        document.getElementById('track-name').innerText = playlist[index].name.replace('.mp3', '');
+        generateCode();
+    }
+
+    function togglePlay() {
+        if(playlist.length === 0) return;
+        if(audio.paused) {
+            audio.play();
+            document.getElementById('master-play').innerText = '⏸';
+            animateViz();
+        } else {
+            audio.pause();
+            document.getElementById('master-play').innerText = '▶';
+        }
+    }
+
+    function next() {
+        currentIndex = (currentIndex + 1) % playlist.length;
+        loadTrack(currentIndex);
+        audio.play();
+    }
+
+    function prev() {
+        currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+        loadTrack(currentIndex);
+        audio.play();
+    }
+
+    // Обновление прогресс-бара
+    audio.ontimeupdate = () => {
+        const pct = (audio.currentTime / audio.duration) * 100;
+        document.getElementById('progress-bar').style.width = pct + '%';
+    };
+
+    function seek(e) {
+        const rect = document.getElementById('progress-container').getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = pos * audio.duration;
+    }
+
+    function animateViz() {
+        if(audio.paused) return;
+        const bars = document.querySelectorAll('.bar');
+        bars.forEach(bar => {
+            const h = Math.random() * 35 + 5;
+            bar.style.height = h + 'px';
+        });
+        setTimeout(animateViz, 150);
+    }
+
+    function generateCode() {
+        const color = document.getElementById('color-picker').value;
+        const gh = document.getElementById('gh-path').value;
+        const htmlCode = `<iframe src="https://vbezgodova523-sketch.github.io/-1/" 
+style="width:500px; height:250px; border:none; background:transparent;" 
+allow="autoplay"></iframe>`;
+        // В реальном Genially тебе нужно будет захостить этот HTML на GitHub Pages 
+        // и вставить ссылку на него.
+        document.getElementById('output-code').value = htmlCode;
+    }
+
+    updateStyle();
+</script>
+</body>
+</html>
